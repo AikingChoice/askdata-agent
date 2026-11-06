@@ -622,3 +622,4 @@ Docker Compose：`app + postgres + optional redis`；数据卷持久化；`.env`
 - 2026-11-05：D8 前端完成；聊天、表格、图表（ECharts 不可用自动回退柱状图）、SQL 审计、追问/拒答状态；DOM 实际点过；`34 passed`。
 - 2026-11-05：D9 工程化完成；Dockerfile/.dockerignore/docker-compose、README、5 问 demo；compose config 通过；Docker daemon 未启动，镜像未实际构建；`34 passed`。
 - 2026-11-05：D10 部署准备 + CI + trace 完成；render.yaml/fly.toml/.github/workflows/ci.yml/DEPLOY.md；JSONL trace 与 PII 脱敏验证；公网 URL 待平台凭据。
+- 2026-11-05：GitHub public repo `AikingChoice/askdata-agent` 已推送；CI 首轮通过；README 加 CI badge 与 Render 一键部署入口；实际公网 URL 待 Render 登录并填 secret。
