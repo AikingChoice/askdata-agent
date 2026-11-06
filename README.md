@@ -1,5 +1,8 @@
 # AskData
 
+[![CI](https://github.com/AikingChoice/askdata-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/AikingChoice/askdata-agent/actions/workflows/ci.yml)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AikingChoice/askdata-agent)
+
 可审计的 Text-to-SQL 数据问数 Agent：自然语言 → schema 检索 → SQL 生成 → 安全闸门 → 只读执行 → 表格/图表。
 
 它不是“把建表语句塞给模型”的教程 Demo，而是一条带**追问、拒答、SQL 审计、修复循环和评估集**的完整链路。
@@ -15,7 +18,7 @@
 | 评估 | 40 条 golden；路由 100%、Valid SQL 97.2%、EX 91.7%、拒答 100% |
 | 前端 | 聊天 + 表格 + 图表 + SQL 审计 + 追问/拒答 |
 | 工程 | 34 tests；GitHub Actions CI；JSONL trace |
-| 部署 | Docker/compose/Render/Fly 配置已准备；公网 URL 待平台凭据 |
+| 部署 | Public GitHub repo + CI 绿；Render 一键部署入口已加，待登录/填 secret |
 
 ## 能力
 
@@ -175,6 +178,8 @@ docker compose up --build
 - VPS：Docker Compose + Nginx + HTTPS。
 
 当前**没有已发布的公网 URL**：实际部署需要平台账号和 `DEEPSEEK_API_KEY` secret。CI 配置在 [.github/workflows/ci.yml](.github/workflows/ci.yml)。
+
+Render 一键入口：<https://render.com/deploy?repo=https://github.com/AikingChoice/askdata-agent>。登录 Render → 选择 GitHub 仓库 → 填 `DEEPSEEK_API_KEY` → Deploy。
 
 ## 目录
 
