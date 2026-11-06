@@ -1,0 +1,328 @@
+version: 1
+currency: CNY
+timezone: Asia/Shanghai
+
+time_defaults:
+  default_range: last_month
+  date_id_format: YYYYMMDD
+  date_column: fact_orders.date_id
+
+dimensions:
+  date:
+    table: dim_dates
+    key: date_id
+    columns:
+      year: year_num
+      quarter: quarter_num
+      month: month_num
+      week: week_num
+    synonyms:
+      - 时间
+      - 日期
+      - 月份
+  region:
+    table: dim_regions
+    key: region_id
+    group_by: region_group
+    city_column: city
+    synonyms:
+      - 地区
+      - 大区
+      - 区域
+  city:
+    table: dim_regions
+    key: region_id
+    group_by: city
+    synonyms:
+      - 城市
+  channel:
+    table: dim_channels
+    key: channel_id
+    name_column: channel_name
+    synonyms:
+      - 渠道
+      - 来源
+  category:
+    table: dim_products
+    key: product_id
+    group_by: category
+    synonyms:
+      - 品类
+      - 类目
+  brand:
+    table: dim_products
+    key: product_id
+    group_by: brand
+    synonyms:
+      - 品牌
+  customer_segment:
+    table: dim_customers
+    key: customer_id
+    group_by: segment
+    synonyms:
+      - 客户分层
+      - 用户类型
+  sales_rep:
+    table: dim_sales_reps
+    key: rep_id
+    name_column: name
+    synonyms:
+      - 销售
+      - 负责人
+  campaign:
+    table: dim_campaigns
+    key: campaign_id
+    name_column: name
+    synonyms:
+      - 活动
+      - 营销活动
+
+metrics:
+  gmv:
+    label: GMV
+    definition: "成交总额：按下单时间统计，含税、未扣退款，排除取消订单。"
+    grain: order
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+    formula: "SUM(CASE WHEN o.status <> 'cancelled' THEN o.net_amount ELSE 0 END)"
+    dimensions:
+      - date
+      - region
+      - channel
+      - category
+      - brand
+      - customer_segment
+    synonyms:
+      - 成交额
+      - 销售额
+      - 交易额
+    caveats: "净收入 = GMV - 退款金额；两者不要混用。"
+  net_revenue:
+    label: 净收入
+    definition: "GMV 扣除退款金额后的收入，按下单时间归集，退款按订单归集。"
+    grain: order
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+      - fact_refunds
+    formula: |
+      SUM(CASE WHEN o.status <> 'cancelled' THEN o.net_amount ELSE 0 END)
+      - COALESCE(SUM(r.refund_amount), 0)
+    dimensions:
+      - date
+      - region
+      - channel
+      - category
+      - customer_segment
+    synonyms:
+      - 净销售额
+      - 营收
+      - 净收入
+    caveats: "退款按订单归集，避免按下单时间/退款时间造成口径漂移。"
+  order_count:
+    label: 订单数
+    definition: "已支付订单数，排除取消订单，按订单去重。"
+    grain: order
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+    formula: "COUNT(DISTINCT CASE WHEN o.status <> 'cancelled' THEN o.order_id END)"
+    dimensions:
+      - date
+      - region
+      - channel
+      - customer_segment
+    synonyms:
+      - 单量
+      - 订单量
+    caveats: "不要用明细行数代替订单数。"
+  aov:
+    label: 客单价
+    definition: "GMV 除以订单数。"
+    grain: order
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+    formula: "gmv / NULLIF(order_count, 0)"
+    dimensions:
+      - date
+      - region
+      - channel
+      - customer_segment
+    synonyms:
+      - 平均订单金额
+      - AOV
+    caveats: "分母用订单数，不是客户数。"
+  refund_rate:
+    label: 退款率
+    definition: "退款金额占 GMV 的比例，退款按订单归集。"
+    grain: order
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+      - fact_refunds
+    formula: |
+      SUM(r.refund_amount) * 1.0
+      / NULLIF(SUM(CASE WHEN o.status <> 'cancelled' THEN o.net_amount ELSE 0 END), 0)
+    dimensions:
+      - date
+      - region
+      - channel
+      - category
+    synonyms:
+      - 退款占比
+    caveats: "退款金额可能多次发生；先按订单聚合再计算比例。"
+  return_rate:
+    label: 退货率
+    definition: "发生退款的订单数占已支付订单数的比例。"
+    grain: order
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+      - fact_refunds
+    formula: |
+      COUNT(DISTINCT r.order_id) * 1.0
+      / NULLIF(COUNT(DISTINCT CASE WHEN o.status <> 'cancelled' THEN o.order_id END), 0)
+    dimensions:
+      - date
+      - region
+      - category
+      - channel
+    synonyms:
+      - 退货占比
+    caveats: "退款订单不等于退货订单；当前 demo 用退款订单近似。"
+  repeat_purchase_rate:
+    label: 复购率
+    definition: "统计周期内下单 ≥2 次的客户数占支付客户数的比例。"
+    grain: customer
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+      - dim_customers
+    formula: |
+      SUM(CASE WHEN customer_order_count >= 2 THEN 1 ELSE 0 END) * 1.0
+      / NULLIF(COUNT(*), 0)
+    dimensions:
+      - date
+      - region
+      - customer_segment
+    synonyms:
+      - 重复购买率
+    caveats: "先按客户聚合订单数，再算比例；不要按订单行算。"
+  gross_margin:
+    label: 毛利率
+    definition: "（净收入 - 商品成本）/ 净收入。"
+    grain: order
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+      - fact_order_items
+      - dim_products
+      - fact_refunds
+    formula: |
+      (net_revenue - SUM(oi.quantity * p.cost))
+      / NULLIF(net_revenue, 0)
+    dimensions:
+      - date
+      - region
+      - category
+      - brand
+    synonyms:
+      - 毛利占比
+    caveats: "成本用商品维 cost；退款会同时影响收入和成本，需按订单归集。"
+
+supporting_measures:
+  refund_amount:
+    label: 退款金额
+    definition: "退款单金额合计，按退款发生时间统计。"
+    grain: refund
+    time_column: fact_refunds.refund_date_id
+    source_tables:
+      - fact_refunds
+    formula: "SUM(r.refund_amount)"
+    dimensions:
+      - date
+      - region
+      - category
+    synonyms:
+      - 退款额
+  new_customer_count:
+    label: 新增客户数
+    definition: "按注册日期统计的新客户数。"
+    grain: customer
+    time_column: dim_customers.register_date_id
+    source_tables:
+      - dim_customers
+    formula: "COUNT(DISTINCT c.customer_id)"
+    dimensions:
+      - date
+      - region
+      - customer_segment
+    synonyms:
+      - 新客数
+  paying_customer_count:
+    label: 支付客户数
+    definition: "统计周期内有已支付订单的客户数。"
+    grain: customer
+    time_column: fact_orders.date_id
+    source_tables:
+      - fact_orders
+    formula: "COUNT(DISTINCT CASE WHEN o.status <> 'cancelled' THEN o.customer_id END)"
+    dimensions:
+      - date
+      - region
+      - channel
+    synonyms:
+      - 下单客户数
+
+ambiguities:
+  - term: 销售额
+    default: gmv
+    alternatives:
+      - net_revenue
+    clarify: true
+    reason: "销售额可能是 GMV，也可能是扣除退款后的净收入。"
+  - term: 华东
+    default: "region_group = '华东'"
+    alternatives:
+      - "province IN ('上海','江苏','浙江','安徽','福建','江西','山东')"
+    clarify: true
+    reason: "区域别名可能指大区，也可能指具体省份集合。"
+  - term: 毛利
+    default: gross_margin
+    alternatives:
+      - "gross_profit_amount"
+    clarify: true
+    reason: "毛利率和毛利额是两个指标。"
+
+derived_metrics:
+  category_gmv:
+    label: 品类销售额
+    definition: "品类销售额按明细金额汇总，不做订单折扣分摊。"
+    formula: "SUM(oi.amount)"
+    source_tables:
+      - fact_orders
+      - fact_order_items
+      - dim_products
+    dimensions:
+      - category
+      - brand
+    synonyms:
+      - 品类销售额
+      - 品类成交额
+    caveats: "不要用订单 net_amount 直接 JOIN 明细，会因一对多 fan-out 放大金额。"
+  category_gross_margin:
+    label: 品类毛利率
+    definition: "品类口径：(明细金额 - 明细成本) / 明细金额；不做订单折扣分摊。"
+    formula: "(SUM(oi.amount) - SUM(oi.quantity * p.cost)) / NULLIF(SUM(oi.amount), 0)"
+    source_tables:
+      - fact_orders
+      - fact_order_items
+      - dim_products
+    dimensions:
+      - category
+      - brand
+    synonyms:
+      - 品类毛利率
+    caveats: "整体毛利率用订单净收入；品类/商品毛利率用明细金额，避免把订单折扣硬分摊到品类。"

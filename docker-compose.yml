@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ASK_DATA_DB: /app/data/askdata.db
+      ASK_TIMEOUT_SECONDS: "30"
+      RETRIEVAL_TOP_K: "8"
+      REPAIR_MAX_ATTEMPTS: "3"

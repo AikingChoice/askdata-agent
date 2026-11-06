@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Load demo database
+        run: uv run python scripts/load_db.py --fresh
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Validate golden SQL
+        run: uv run python scripts/build_golden.py
+
+      - name: Validate semantic routing
+        run: uv run python scripts/eval_semantic_routing.py
+
+      - name: Evaluate schema retrieval
+        run: uv run python scripts/eval_schema_retrieval.py

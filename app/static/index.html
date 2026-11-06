@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AskData · 数据问数 Agent</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #172033;
+      --muted: #6b7280;
+      --line: #e4e8f0;
+      --accent: #2563eb;
+      --accent-soft: #e9efff;
+      --green: #0f766e;
+      --green-soft: #e6f7f2;
+      --amber: #b45309;
+      --amber-soft: #fff4e5;
+      --red: #b91c1c;
+      --red-soft: #feecec;
+      --code: #111827;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 18% 0%, #e8efff, var(--bg) 42%);
+      color: var(--text);
+      font: 15px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    header {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 20px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 38px; height: 38px; border-radius: 12px;
+      background: var(--accent); color: #fff;
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 20px;
+      box-shadow: 0 8px 18px rgba(37, 99, 235, .25);
+    }
+    h1 { margin: 0; font-size: 22px; letter-spacing: .2px; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .status {
+      font-size: 12px; color: var(--muted);
+      border: 1px solid var(--line); background: #fff;
+      padding: 5px 10px; border-radius: 999px;
+    }
+    main { max-width: 980px; margin: 0 auto; padding: 0 20px 36px; }
+    #chat {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      min-height: 480px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 14px 44px rgba(35, 55, 95, .07);
+    }
+    .msg { display: flex; gap: 10px; }
+    .msg.user { justify-content: flex-end; }
+    .bubble {
+      max-width: 88%;
+      padding: 12px 15px;
+      border-radius: 15px;
+      background: #f4f6fa;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg.user .bubble { background: var(--accent); color: #fff; }
+    .route-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .badge.sql { background: var(--green-soft); color: var(--green); }
+    .badge.clarify { background: var(--amber-soft); color: var(--amber); }
+    .badge.refuse { background: var(--red-soft); color: var(--red); }
+    .model { color: var(--muted); font-size: 12px; }
+    .answer { font-size: 15px; }
+    .meta { margin-top: 8px; color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip {
+      font-size: 11px; color: var(--muted);
+      background: #fff; border: 1px solid var(--line);
+      border-radius: 999px; padding: 2px 8px;
+    }
+    .error {
+      margin-top: 8px; padding: 8px 10px;
+      border-radius: 8px; background: var(--red-soft); color: var(--red);
+      font-size: 13px;
+    }
+    .table-wrap {
+      margin-top: 10px;
+      max-height: 320px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+    th { position: sticky; top: 0; background: #f8fafc; color: var(--muted); font-weight: 600; z-index: 1; }
+    tr:last-child td { border-bottom: 0; }
+    .chart { width: 100%; height: 270px; margin-top: 10px; }
+    .fallback-chart { margin-top: 10px; display: grid; gap: 6px; }
+    .fallback-row { display: grid; grid-template-columns: 120px 1fr 70px; gap: 8px; align-items: center; font-size: 12px; }
+    .fallback-bar { height: 12px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
+    .fallback-bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+    details.sql-block {
+      margin-top: 10px; border: 1px solid var(--line);
+      border-radius: 10px; background: #fff; overflow: hidden;
+    }
+    details.sql-block summary {
+      cursor: pointer; padding: 8px 12px; color: var(--accent);
+      font-size: 13px; background: #f8fafc;
+    }
+    .sql-head { display: flex; justify-content: flex-end; padding: 6px 10px 0; }
+    .copy {
+      border: 1px solid var(--line); background: #fff; color: var(--muted);
+      border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer;
+    }
+    pre {
+      margin: 0; padding: 12px; overflow-x: auto;
+      background: var(--code); color: #e5e7eb;
+      font: 12px/1.55 Consolas, "SFMono-Regular", monospace;
+    }
+    #quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+    #quick button {
+      border: 1px solid var(--line); background: #fff; color: var(--text);
+      border-radius: 999px; padding: 7px 12px; cursor: pointer; font-size: 13px;
+    }
+    #quick button:hover { border-color: var(--accent); color: var(--accent); }
+    form {
+      display: flex; gap: 10px;
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 15px; padding: 10px;
+      box-shadow: 0 8px 24px rgba(35, 55, 95, .06);
+    }
+    input {
+      flex: 1; border: 0; outline: 0; font: inherit;
+      padding: 9px; background: transparent;
+    }
+    form button {
+      border: 0; border-radius: 10px; background: var(--accent);
+      color: #fff; padding: 9px 20px; font: inherit; cursor: pointer;
+    }
+    form button:disabled { opacity: .5; cursor: not-allowed; }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    @media (max-width: 620px) {
+      header { padding-top: 16px; }
+      .bubble { max-width: 96%; }
+      .fallback-row { grid-template-columns: 80px 1fr 60px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">A</div>
+      <div>
+        <h1>AskData</h1>
+        <div class="sub">可审计的数据问数 Agent · SQL / 追问 / 拒答</div>
+      </div>
+    </div>
+    <div class="status" id="status">就绪</div>
+  </header>
+  <main>
+    <section id="chat" aria-live="polite"></section>
+    <div id="quick">
+      <button data-q="上月 GMV 是多少？">上月 GMV</button>
+      <button data-q="本月各品类销售额 top 3">品类 Top 3</button>
+      <button data-q="各渠道退款率">渠道退款率</button>
+      <button data-q="最近销售怎么样？">需要追问</button>
+      <button data-q="查一下用户的身份证号">敏感数据</button>
+    </div>
+    <form id="form">
+      <input id="question" autocomplete="off" placeholder="输入问题，例如：上月 GMV 是多少？">
+      <button id="send" type="submit">发送</button>
+    </form>
+    <div class="hint">示例：上月 GMV / 本月各品类销售额 top 3 / 各渠道退款率 / 10 月和 11 月各区域退款率</div>
+  </main>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("form");
+    const input = document.getElementById("question");
+    const send = document.getElementById("send");
+    const status = document.getElementById("status");
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function addMessage(role, text) {
+      const wrap = el("div", "msg " + role);
+      const bubble = el("div", "bubble");
+      if (text !== undefined) bubble.textContent = text;
+      wrap.appendChild(bubble);
+      chat.appendChild(wrap);
+      chat.scrollTop = chat.scrollHeight;
+      return { wrap, bubble };
+    }
+
+    function formatValue(value) {
+      if (value === null || value === undefined) return "NULL";
+      if (typeof value === "number") {
+        if (Number.isInteger(value)) return String(value);
+        return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+      }
+      return String(value);
+    }
+
+    function routeLabel(route) {
+      if (route === "sql") return "SQL";
+      if (route === "clarify") return "追问";
+      if (route === "refuse") return "拒答";
+      return route || "未知";
+    }
+
+    function renderTable(card, data) {
+      if (!data.columns || !data.columns.length || !data.rows || !data.rows.length) return;
+      const wrap = el("div", "table-wrap");
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      data.columns.forEach((column) => headRow.appendChild(el("th", "", column)));
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      data.rows.slice(0, 50).forEach((row) => {
+        const tr = document.createElement("tr");
+        data.columns.forEach((column) => tr.appendChild(el("td", "", formatValue(row[column]))));
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+      card.appendChild(wrap);
+      if (data.row_count > 50) {
+        card.appendChild(el("div", "meta", `仅展示前 50 行，共 ${data.row_count} 行`));
+      }
+    }
+
+    function renderFallbackChart(card, labels, values) {
+      const wrap = el("div", "fallback-chart");
+      const max = Math.max(...values.map((value) => Math.abs(Number(value)) || 0), 1);
+      labels.forEach((label, index) => {
+        const row = el("div", "fallback-row");
+        row.appendChild(el("div", "", label));
+        const bar = el("div", "fallback-bar");
+        const fill = el("span");
+        fill.style.width = `${Math.max(2, Math.abs(Number(values[index]) || 0) / max * 100)}%`;
+        bar.appendChild(fill);
+        row.appendChild(bar);
+        row.appendChild(el("div", "", formatValue(values[index])));
+        wrap.appendChild(row);
+      });
+      card.appendChild(wrap);
+    }
+
+    function renderChart(card, data) {
+      if (!data.columns || !data.rows || data.rows.length < 2) return;
+      const numericColumns = data.columns.filter((column) => {
+        if (/month|year|quarter|week|date|id/i.test(column)) return false;
+        return data.rows.every((row) => {
+          const value = row[column];
+          return value === null || value === undefined || (Number.isFinite(Number(value)) && value !== "");
+        });
+      });
+      if (!numericColumns.length) return;
+      const category = data.columns.find((column) => !numericColumns.includes(column)) || data.columns[0];
+      const labels = data.rows.map((row) => formatValue(row[category]));
+      const line = /month|date|week|year/i.test(category);
+      if (window.echarts) {
+        const chartEl = el("div", "chart");
+        card.appendChild(chartEl);
+        const chart = echarts.init(chartEl);
+        chart.setOption({
+          tooltip: { trigger: "axis" },
+          grid: { left: 12, right: 18, top: 22, bottom: 64, containLabel: true },
+          xAxis: {
+            type: "category",
+            data: labels,
+            axisLabel: { rotate: labels.length > 6 ? 30 : 0, interval: 0, overflow: "truncate", width: 110 }
+          },
+          yAxis: { type: "value", splitLine: { lineStyle: { color: "#eef1f6" } } },
+          series: numericColumns.slice(0, 3).map((column) => ({
+            name: column,
+            type: line ? "line" : "bar",
+            smooth: line,
+            barMaxWidth: 36,
+            data: data.rows.map((row) => Number(row[column]))
+          }))
+        });
+        window.addEventListener("resize", () => chart.resize());
+      } else {
+        renderFallbackChart(card, labels, data.rows.map((row) => row[numericColumns[0]]));
+      }
+    }
+
+    function renderSql(card, data) {
+      if (!data.sql) return;
+      const details = el("details", "sql-block");
+      const summary = el("summary", "", data.raw_sql && data.raw_sql !== data.sql
+        ? "查看执行 SQL（已加安全 LIMIT）"
+        : "查看执行 SQL");
+      details.appendChild(summary);
+      const head = el("div", "sql-head");
+      const copy = el("button", "copy", "复制");
+      copy.type = "button";
+      copy.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(data.sql);
+          copy.textContent = "已复制";
+          setTimeout(() => { copy.textContent = "复制"; }, 1200);
+        } catch (error) {
+          copy.textContent = "复制失败";
+        }
+      });
+      head.appendChild(copy);
+      details.appendChild(head);
+      details.appendChild(el("pre", "", data.sql));
+      card.appendChild(details);
+    }
+
+    function renderAnalysis(card, data) {
+      const analysis = data.analysis || {};
+      const chips = el("div", "chips");
+      if (analysis.metric) chips.appendChild(el("span", "chip", "metric: " + analysis.metric));
+      if (analysis.time_range && analysis.time_range.length) {
+        chips.appendChild(el("span", "chip", "time: " + analysis.time_range.join("/")));
+      }
+      if (analysis.dimensions && analysis.dimensions.length) {
+        chips.appendChild(el("span", "chip", "dims: " + analysis.dimensions.join("/")));
+      }
+      if (analysis.reason && analysis.reason !== "ok") {
+        chips.appendChild(el("span", "chip", "reason: " + analysis.reason));
+      }
+      data.trace && data.trace.forEach((node) => chips.appendChild(el("span", "chip", node)));
+      if (chips.childNodes.length) card.appendChild(chips);
+    }
+
+    function renderResponse(card, data) {
+      const row = el("div", "route-row");
+      const badge = el("span", "badge " + (data.route || ""), routeLabel(data.route));
+      row.appendChild(badge);
+      row.appendChild(el("span", "model", data.model || ""));
+      card.appendChild(row);
+
+      let answer = data.answer || "";
+      if (data.route === "sql") {
+        if (data.error) {
+          answer = "SQL 执行失败：" + data.error;
+        } else if (data.row_count === 1 && data.rows && data.rows.length) {
+          answer = `已执行，返回 1 行结果。`;
+        } else {
+          answer = `已执行，返回 ${data.row_count || 0} 行结果。`;
+        }
+      }
+      card.appendChild(el("div", "answer", answer));
+
+      if (data.error) card.appendChild(el("div", "error", data.error));
+      if (data.route === "sql") {
+        renderTable(card, data);
+        renderChart(card, data);
+        renderSql(card, data);
+      }
+      renderAnalysis(card, data);
+      const meta = el("div", "meta");
+      if (data.latency_ms !== undefined) meta.appendChild(el("span", "", `${data.latency_ms} ms`));
+      if (data.attempts !== undefined) meta.appendChild(el("span", "", `attempts: ${data.attempts}`));
+      if (data.selected_tables && data.selected_tables.length) {
+        meta.appendChild(el("span", "", "tables: " + data.selected_tables.join(", ")));
+      }
+      if (meta.childNodes.length) card.appendChild(meta);
+    }
+
+    async function ask(question) {
+      if (!question.trim() || send.disabled) return;
+      send.disabled = true;
+      input.value = "";
+      addMessage("user", question);
+      const assistant = addMessage("assistant", "");
+      assistant.bubble.appendChild(el("div", "answer", "分析中…"));
+      status.textContent = "调用 Agent…";
+
+      try {
+        const response = await fetch("/api/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question })
+        });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const data = await response.json();
+        assistant.bubble.textContent = "";
+        renderResponse(assistant.bubble, data);
+        status.textContent = "完成";
+      } catch (error) {
+        assistant.bubble.textContent = "";
+        assistant.bubble.appendChild(el("div", "answer", "请求失败"));
+        assistant.bubble.appendChild(el("div", "error", error.message));
+        status.textContent = "失败";
+      } finally {
+        send.disabled = false;
+        chat.scrollTop = chat.scrollHeight;
+      }
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      ask(input.value);
+    });
+    document.querySelectorAll("#quick button").forEach((button) => {
+      button.addEventListener("click", () => ask(button.dataset.q || button.textContent));
+    });
+
+    addMessage("assistant", "你好，我是 AskData。可以问：上月 GMV、本月各品类销售额 top 3、各渠道退款率。缺少口径时我会先追问，遇到敏感数据或写操作会拒答。");
+  </script>
+</body>
+</html>
